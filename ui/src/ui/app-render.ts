@@ -56,6 +56,8 @@ import { icons } from "./icons.ts";
 import { normalizeBasePath, getTabGroups, subtitleForTab, titleForTab } from "./navigation.ts";
 import {
   getOnboardingActionState,
+  hasCompletedFirstRun,
+  hasConfiguredIntegration,
   getOnboardingNextStep,
   getOnboardingNextTab,
   getOnboardingProgress,
@@ -98,6 +100,18 @@ function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
   return identity?.avatarUrl;
 }
 
+function clearOnboardingQueryParam() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has("onboarding")) {
+    return;
+  }
+  url.searchParams.delete("onboarding");
+  window.history.replaceState({}, "", url.toString());
+}
+
 export function renderApp(state: AppViewState) {
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
@@ -116,10 +130,12 @@ export function renderApp(state: AppViewState) {
     state.agentsList?.defaultId ??
     state.agentsList?.agents?.[0]?.id ??
     null;
+  const integrationsReady = hasConfiguredIntegration(state.channelsSnapshot);
+  const firstRunReady = hasCompletedFirstRun(state.sessionsResult);
   const onboardingSteps = getOnboardingSteps({
     connected: state.connected,
-    channelsLastSuccess: state.channelsLastSuccess,
-    sessionsCount,
+    integrationsReady,
+    firstRunReady,
   });
   const onboardingActions = getOnboardingActionState(onboardingSteps);
   const onboardingProgress = getOnboardingProgress(onboardingSteps);
@@ -128,6 +144,17 @@ export function renderApp(state: AppViewState) {
   const onboardingNextLabel = nextOnboardingStep
     ? t(`overview.setupFlow.${nextOnboardingStep.key}`)
     : t("overview.setupFlow.review");
+  const onboardingCanOpenNext =
+    onboardingNextTab === "chat"
+      ? onboardingActions.canOpenChat
+      : onboardingNextTab === "consent"
+        ? onboardingActions.canOpenConsent
+        : true;
+  const completeOnboarding = () => {
+    state.onboarding = false;
+    state.onboardingBannerDismissed = true;
+    clearOnboardingQueryParam();
+  };
 
   return html`
     <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
@@ -261,8 +288,13 @@ export function renderApp(state: AppViewState) {
                       type="button"
                       class="btn btn--sm"
                       data-testid="onboarding-banner-next-step"
-                      ?disabled=${onboardingNextTab === "chat" && !state.connected}
-                      @click=${() => state.setTab(onboardingNextTab)}
+                      ?disabled=${!onboardingCanOpenNext}
+                      @click=${() => {
+                        if (!nextOnboardingStep) {
+                          completeOnboarding();
+                        }
+                        state.setTab(onboardingNextTab);
+                      }}
                     >
                       ${t("overview.setupFlow.next")}: ${onboardingNextLabel}
                     </button>
@@ -345,6 +377,8 @@ export function renderApp(state: AppViewState) {
                 onOpenChannels: () => state.setTab("channels"),
                 onOpenChat: () => state.setTab("chat"),
                 onOpenConsent: () => state.setTab("consent"),
+                onCompleteOnboarding: completeOnboarding,
+                onboardingSteps,
               })
             : nothing
         }

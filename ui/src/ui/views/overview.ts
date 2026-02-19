@@ -6,6 +6,7 @@ import {
   getOnboardingActionState,
   getOnboardingNextStep,
   getOnboardingStepStatusKey,
+  type OnboardingStep,
   getOnboardingSteps,
   getOnboardingProgress,
 } from "../onboarding-flow.ts";
@@ -32,6 +33,8 @@ export type OverviewProps = {
   onOpenChannels?: () => void;
   onOpenChat?: () => void;
   onOpenConsent?: () => void;
+  onCompleteOnboarding?: () => void;
+  onboardingSteps?: OnboardingStep[];
 };
 
 export function renderOverview(props: OverviewProps) {
@@ -141,11 +144,13 @@ export function renderOverview(props: OverviewProps) {
 
   const currentLocale = i18n.getLocale();
   const showSetupFlow = Boolean(props.onboarding);
-  const onboardingSteps = getOnboardingSteps({
-    connected: props.connected,
-    channelsLastSuccess: props.lastChannelsRefresh,
-    sessionsCount: props.sessionsCount,
-  });
+  const onboardingSteps =
+    props.onboardingSteps ??
+    getOnboardingSteps({
+      connected: props.connected,
+      integrationsReady: props.lastChannelsRefresh != null,
+      firstRunReady: (props.sessionsCount ?? 0) > 0,
+    });
   const onboardingProgress = getOnboardingProgress(onboardingSteps);
   const nextOnboardingStep = getOnboardingNextStep(onboardingSteps);
   const onboardingActions = getOnboardingActionState(onboardingSteps);
@@ -159,6 +164,7 @@ export function renderOverview(props: OverviewProps) {
 
   const runNextOnboardingAction = () => {
     if (!nextOnboardingStep) {
+      props.onCompleteOnboarding?.();
       props.onOpenConsent?.();
       return;
     }

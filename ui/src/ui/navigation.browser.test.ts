@@ -14,6 +14,21 @@ function nextFrame() {
   });
 }
 
+function setIntegrationReady(app: ReturnType<typeof mountApp>, ready: boolean) {
+  app.channelsSnapshot = ready
+    ? ({
+        ts: Date.now(),
+        channelOrder: ["telegram"],
+        channelLabels: {},
+        channels: {},
+        channelAccounts: {
+          telegram: [{ accountId: "primary", configured: true, enabled: true }],
+        },
+        channelDefaultAccountId: {},
+      } as never)
+    : null;
+}
+
 describe("control UI routing", () => {
   it("hydrates the tab from the location", async () => {
     const app = mountApp("/sessions");
@@ -253,9 +268,10 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = Date.now();
+    setIntegrationReady(app, true);
     app.sessionsResult = {
       count: 1,
-      sessions: [],
+      sessions: [{ key: "setup", kind: "direct", updatedAt: Date.now() }],
       cursor: null,
     } as never;
     await app.updateComplete;
@@ -295,6 +311,7 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = null;
+    setIntegrationReady(app, false);
     await app.updateComplete;
 
     const button = app.querySelector<HTMLButtonElement>('[data-testid="onboarding-setup-flow-chat"]');
@@ -308,6 +325,7 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = Date.now();
+    setIntegrationReady(app, true);
     app.sessionsResult = {
       count: 0,
       sessions: [],
@@ -342,9 +360,10 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = Date.now();
+    setIntegrationReady(app, true);
     app.sessionsResult = {
       count: 1,
-      sessions: [],
+      sessions: [{ key: "setup", kind: "direct", updatedAt: Date.now() }],
       cursor: null,
     } as never;
     await app.updateComplete;
@@ -354,8 +373,10 @@ describe("control UI routing", () => {
     button?.click();
     await app.updateComplete;
 
+    expect(app.onboarding).toBe(false);
     expect(app.tab).toBe("consent");
     expect(window.location.pathname).toBe("/consent");
+    expect(window.location.search).toBe("");
   });
 
   it("navigates to integrations from onboarding banner actions", async () => {
@@ -379,9 +400,10 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = Date.now();
+    setIntegrationReady(app, true);
     app.sessionsResult = {
       count: 1,
-      sessions: [],
+      sessions: [{ key: "setup", kind: "direct", updatedAt: Date.now() }],
       cursor: null,
     } as never;
     await app.updateComplete;
@@ -411,6 +433,7 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = Date.now();
+    setIntegrationReady(app, true);
     await app.updateComplete;
 
     const button = app.querySelector<HTMLButtonElement>('[data-testid="onboarding-banner-chat"]');
@@ -429,6 +452,7 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = null;
+    setIntegrationReady(app, false);
     await app.updateComplete;
 
     const button = app.querySelector<HTMLButtonElement>('[data-testid="onboarding-banner-chat"]');
@@ -442,6 +466,7 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = Date.now();
+    setIntegrationReady(app, true);
     app.sessionsResult = {
       count: 0,
       sessions: [],
@@ -473,9 +498,10 @@ describe("control UI routing", () => {
 
     app.connected = true;
     app.channelsLastSuccess = Date.now();
+    setIntegrationReady(app, true);
     app.sessionsResult = {
       count: 1,
-      sessions: [],
+      sessions: [{ key: "setup", kind: "direct", updatedAt: Date.now() }],
       cursor: null,
     } as never;
     await app.updateComplete;
@@ -485,7 +511,9 @@ describe("control UI routing", () => {
     button?.click();
     await app.updateComplete;
 
+    expect(app.onboarding).toBe(false);
     expect(app.tab).toBe("consent");
     expect(window.location.pathname).toBe("/consent");
+    expect(window.location.search).toBe("");
   });
 });

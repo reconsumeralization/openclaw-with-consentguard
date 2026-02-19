@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   getOnboardingActionState,
+  hasCompletedFirstRun,
+  hasConfiguredIntegration,
   getOnboardingNextStep,
   getOnboardingNextTab,
   getOnboardingProgress,
@@ -12,8 +14,8 @@ describe("onboarding flow", () => {
   it("derives ordered steps from gateway and usage state", () => {
     const steps = getOnboardingSteps({
       connected: true,
-      channelsLastSuccess: null,
-      sessionsCount: 0,
+      integrationsReady: false,
+      firstRunReady: false,
     });
 
     expect(steps).toEqual([
@@ -26,8 +28,8 @@ describe("onboarding flow", () => {
   it("returns consent as the next tab when onboarding is complete", () => {
     const steps = getOnboardingSteps({
       connected: true,
-      channelsLastSuccess: Date.now(),
-      sessionsCount: 2,
+      integrationsReady: true,
+      firstRunReady: true,
     });
 
     expect(getOnboardingProgress(steps)).toEqual({ done: 3, total: 3 });
@@ -38,8 +40,8 @@ describe("onboarding flow", () => {
   it("computes consistent action gating from step state", () => {
     const partial = getOnboardingSteps({
       connected: true,
-      channelsLastSuccess: null,
-      sessionsCount: 0,
+      integrationsReady: false,
+      firstRunReady: false,
     });
     expect(getOnboardingActionState(partial)).toEqual({
       gatewayReady: true,
@@ -51,8 +53,8 @@ describe("onboarding flow", () => {
 
     const complete = getOnboardingSteps({
       connected: true,
-      channelsLastSuccess: Date.now(),
-      sessionsCount: 1,
+      integrationsReady: true,
+      firstRunReady: true,
     });
     expect(getOnboardingActionState(complete)).toEqual({
       gatewayReady: true,
@@ -66,11 +68,61 @@ describe("onboarding flow", () => {
   it("maps step status labels consistently", () => {
     const steps = getOnboardingSteps({
       connected: false,
-      channelsLastSuccess: null,
-      sessionsCount: 0,
+      integrationsReady: false,
+      firstRunReady: false,
     });
     expect(getOnboardingStepStatusKey(steps[0])).toBe("common.offline");
     expect(getOnboardingStepStatusKey(steps[1])).toBe("common.na");
     expect(getOnboardingStepStatusKey(steps[2])).toBe("common.na");
+  });
+
+  it("requires an active configured account to mark integrations complete", () => {
+    expect(
+      hasConfiguredIntegration({
+        ts: Date.now(),
+        channelOrder: ["telegram"],
+        channelLabels: {},
+        channels: {},
+        channelAccounts: {
+          telegram: [{ accountId: "a1", configured: true, enabled: true }],
+        },
+        channelDefaultAccountId: {},
+      }),
+    ).toBe(true);
+
+    expect(
+      hasConfiguredIntegration({
+        ts: Date.now(),
+        channelOrder: ["telegram"],
+        channelLabels: {},
+        channels: {},
+        channelAccounts: {
+          telegram: [{ accountId: "a1", configured: false, enabled: false }],
+        },
+        channelDefaultAccountId: {},
+      }),
+    ).toBe(false);
+  });
+
+  it("counts first run only from direct or group sessions", () => {
+    expect(
+      hasCompletedFirstRun({
+        ts: Date.now(),
+        path: "",
+        count: 1,
+        defaults: { model: null, contextTokens: null },
+        sessions: [{ key: "global", kind: "global", updatedAt: Date.now() }],
+      }),
+    ).toBe(false);
+
+    expect(
+      hasCompletedFirstRun({
+        ts: Date.now(),
+        path: "",
+        count: 1,
+        defaults: { model: null, contextTokens: null },
+        sessions: [{ key: "chat", kind: "direct", updatedAt: Date.now() }],
+      }),
+    ).toBe(true);
   });
 });
