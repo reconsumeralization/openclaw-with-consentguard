@@ -9,11 +9,11 @@ import type { ConsentGateApi } from "./api.js";
 import { createNoOpConsentGateApi } from "./api.js";
 import { createConsentEngine } from "./engine.js";
 import { createConsentMetrics } from "./metrics.js";
-import type { TokenStore } from "./store.js";
 import { createFileBackedTokenStore } from "./store-file.js";
+import type { TokenStore } from "./store.js";
 import { createInMemoryTokenStore } from "./store.js";
-import type { WalWriter } from "./wal.js";
 import { createFileBackedWal } from "./wal-file.js";
+import type { WalWriter } from "./wal.js";
 import { createInMemoryWal } from "./wal.js";
 
 /** Default tool/command names that require consent when ConsentGate is enabled. */
@@ -33,25 +33,20 @@ const POLICY_VERSION = "1";
 /** Lazy singleton per process (gateway typically has one config). */
 let cachedApi: ConsentGateApi | null = null;
 let cachedConfigKey: string | null = null;
-let cachedRuntime:
-  | {
-      key: string;
-      store: TokenStore;
-      wal: WalWriter;
-      metrics: ReturnType<typeof createConsentMetrics>;
-      quarantine: Set<string>;
-    }
-  | null = null;
+let cachedRuntime: {
+  key: string;
+  store: TokenStore;
+  wal: WalWriter;
+  metrics: ReturnType<typeof createConsentMetrics>;
+  quarantine: Set<string>;
+} | null = null;
 
 function configKey(cfg: OpenClawConfig): string {
   const cg = cfg.gateway?.consentGate;
   if (!cg?.enabled) return "off";
-  return [
-    "on",
-    cg.observeOnly ?? true,
-    (cg.gatedTools ?? []).join(","),
-    cg.storagePath ?? "",
-  ].join("|");
+  return ["on", cg.observeOnly ?? true, (cg.gatedTools ?? []).join(","), cg.storagePath ?? ""].join(
+    "|",
+  );
 }
 
 function runtimeStateKey(storagePath: string | undefined): string {
@@ -71,9 +66,7 @@ function resolveRuntimeState(storagePath: string | undefined): {
     return cachedRuntime;
   }
   const trimmed = storagePath?.trim();
-  const store = trimmed
-    ? createFileBackedTokenStore(trimmed)
-    : createInMemoryTokenStore();
+  const store = trimmed ? createFileBackedTokenStore(trimmed) : createInMemoryTokenStore();
   const wal = trimmed ? createFileBackedWal(trimmed) : createInMemoryWal();
   const metrics = createConsentMetrics();
   const quarantine = new Set<string>();
@@ -103,7 +96,8 @@ export function resolveConsentGateApi(cfg: OpenClawConfig): ConsentGateApi {
     return cachedApi;
   }
   const runtime = resolveRuntimeState(cg.storagePath);
-  const tierToolMatrix = cg.tierToolMatrix && typeof cg.tierToolMatrix === "object" ? cg.tierToolMatrix : undefined;
+  const tierToolMatrix =
+    cg.tierToolMatrix && typeof cg.tierToolMatrix === "object" ? cg.tierToolMatrix : undefined;
   const rateLimit =
     cg.rateLimit &&
     typeof cg.rateLimit.maxOpsPerWindow === "number" &&

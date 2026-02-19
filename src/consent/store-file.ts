@@ -5,9 +5,9 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { ConsentToken, ConsentTokenStatus } from "./types.js";
 import type { TokenStore } from "./store.js";
 import { ALLOWED_TRANSITIONS } from "./store.js";
+import type { ConsentToken, ConsentTokenStatus } from "./types.js";
 
 const TOKENS_FILE = "tokens.json";
 const TOKENS_TMP = "tokens.json.tmp";

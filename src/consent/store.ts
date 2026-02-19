@@ -4,8 +4,8 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type { ConsentToken, ConsentTokenStatus } from "./types.js";
 import { CONSENT_REASON } from "./reason-codes.js";
+import type { ConsentToken, ConsentTokenStatus } from "./types.js";
 
 /** Used by in-memory and file-backed stores. */
 export const ALLOWED_TRANSITIONS: Record<ConsentTokenStatus, ConsentTokenStatus[]> = {

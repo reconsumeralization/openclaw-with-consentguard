@@ -3,6 +3,7 @@
  * When ConsentGate is disabled or not configured, the no-op adapter returns allow and does not write WAL.
  */
 
+import type { ConsentMetricsSnapshot } from "./metrics.js";
 import type {
   ConsentConsumeInput,
   ConsentConsumeResult,
@@ -12,7 +13,6 @@ import type {
   ConsentStatusSnapshot,
   ConsentToken,
 } from "./types.js";
-import type { ConsentMetricsSnapshot } from "./metrics.js";
 
 /** Consent decision engine + token store + WAL interface. */
 export type ConsentGateApi = {

@@ -125,7 +125,9 @@ export type ConsentStatusQuery = {
 };
 
 export type ConsentStatusSnapshot = {
-  tokens: Array<Pick<ConsentToken, "jti" | "status" | "tool" | "sessionKey" | "issuedAt" | "expiresAt">>;
+  tokens: Array<
+    Pick<ConsentToken, "jti" | "status" | "tool" | "sessionKey" | "issuedAt" | "expiresAt">
+  >;
   recentEvents: WalEvent[];
   /** Session keys (and tenant ids) currently in containment quarantine. */
   quarantinedSessionKeys?: string[];

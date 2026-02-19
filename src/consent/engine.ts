@@ -3,6 +3,11 @@
  */
 
 import { createSubsystemLogger } from "../logging/subsystem.js";
+import type { ConsentGateApi } from "./api.js";
+import type { ConsentMetrics } from "./metrics.js";
+import { CONSENT_REASON, getConsentReasonMessage } from "./reason-codes.js";
+import type { TokenStore } from "./store.js";
+import { buildToken } from "./store.js";
 import type {
   ConsentConsumeInput,
   ConsentConsumeResult,
@@ -12,12 +17,7 @@ import type {
   ConsentStatusSnapshot,
   ConsentToken,
 } from "./types.js";
-import type { ConsentGateApi } from "./api.js";
-import type { ConsentMetrics } from "./metrics.js";
-import type { TokenStore } from "./store.js";
 import type { WalWriter } from "./wal.js";
-import { CONSENT_REASON, getConsentReasonMessage } from "./reason-codes.js";
-import { buildToken } from "./store.js";
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const consentLog = createSubsystemLogger("consentgate");
@@ -48,7 +48,13 @@ function deny(reasonCode: string, correlationId: string): ConsentConsumeResult {
 function observe(
   metrics: ConsentMetrics | undefined,
   eventType: "issue" | "consume" | "revoke" | "deny" | "quarantine",
-  payload: { jti?: string | null; tool: string; sessionKey: string; reasonCode?: string; correlationId?: string },
+  payload: {
+    jti?: string | null;
+    tool: string;
+    sessionKey: string;
+    reasonCode?: string;
+    correlationId?: string;
+  },
 ): void {
   if (eventType === "issue") metrics?.incrementIssue();
   else if (eventType === "consume") metrics?.incrementConsume();
@@ -64,7 +70,10 @@ export function createConsentEngine(deps: ConsentEngineDeps): ConsentGateApi {
 
   function isQuarantined(sessionKey: string, tenantId?: string): boolean {
     if (!quarantine?.size) return false;
-    return quarantine.has(sessionKey) || (tenantId != null && tenantId !== "" && quarantine.has(tenantId));
+    return (
+      quarantine.has(sessionKey) ||
+      (tenantId != null && tenantId !== "" && quarantine.has(tenantId))
+    );
   }
 
   function checkTierTool(trustTier: string, tool: string): boolean {
@@ -566,7 +575,10 @@ async function evaluateOnly(
   const correlationId = input.correlationId ?? "";
   const isQuarantined = (sessionKey: string, tenantId?: string): boolean => {
     if (!quarantine?.size) return false;
-    return quarantine.has(sessionKey) || (tenantId != null && tenantId !== "" && quarantine.has(tenantId));
+    return (
+      quarantine.has(sessionKey) ||
+      (tenantId != null && tenantId !== "" && quarantine.has(tenantId))
+    );
   };
   if (isQuarantined(input.sessionKey, input.tenantId)) {
     wal.append({

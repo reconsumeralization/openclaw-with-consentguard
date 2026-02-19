@@ -4,7 +4,15 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, renameSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  renameSync,
+} from "node:fs";
 import path from "node:path";
 import type { WalEvent } from "./types.js";
 import type { WalWriter } from "./wal.js";
