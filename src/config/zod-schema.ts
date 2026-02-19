@@ -180,7 +180,12 @@ export const OpenClawSchema = z
             z.literal("trace"),
           ])
           .optional(),
-        file: z.string().optional(),
+        file: z
+          .union([
+            z.string(),
+            z.object({ path: z.string(), rotate: z.boolean().optional() }).strict(),
+          ])
+          .optional(),
         consoleLevel: z
           .union([
             z.literal("silent"),
@@ -448,6 +453,7 @@ export const OpenClawSchema = z
           .object({
             mode: z.union([z.literal("off"), z.literal("serve"), z.literal("funnel")]).optional(),
             resetOnExit: z.boolean().optional(),
+            hostname: z.string().optional(),
           })
           .strict()
           .optional(),
@@ -578,6 +584,15 @@ export const OpenClawSchema = z
                 weightsByReason: z.record(z.string(), z.number()).optional(),
                 quarantineThreshold: z.number().min(0).optional(),
                 cascadeRevokeOnQuarantine: z.boolean().optional(),
+              })
+              .strict()
+              .optional(),
+            provider: z.union([z.literal("native"), z.literal("external")]).optional(),
+            audit: z
+              .object({
+                enabled: z.boolean().optional(),
+                destination: z.string().optional(),
+                redactSecrets: z.boolean().optional(),
               })
               .strict()
               .optional(),

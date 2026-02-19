@@ -39,8 +39,15 @@ When a gated tool or node command is denied, the response includes a `reasonCode
 
 - Decisions are written to the WAL (in-memory when no storage path; file-backed when `gateway.consentGate.storagePath` is set). Use `GET /api/consent/status?sessionKey=...&sinceMs=...` to inspect recent events (Control UI live mode or API).
 - **Audit export (JSONL):** When durable storage is configured, `GET /api/consent/export?sinceMs=...&untilMs=...&limit=...&correlationId=...` returns WAL events as newline-delimited JSON (NDJSON) for SIEM or compliance. Requires gateway auth. Example: `curl -H "Authorization: Bearer <token>" "http://localhost:18789/api/consent/export?limit=500"`.
+- **Enterprise audit stream:** Set `gateway.consentGate.audit.enabled: true` and `gateway.consentGate.audit.destination` to `"stdout"` or a file path. Every consent event is then written as JSONL to that destination (with optional `audit.redactSecrets: true`). Use for SIEM or compliance pipelines without calling the export API.
 - **Metrics:** `GET /api/consent/metrics` returns a snapshot of consent counters (issues, consumes, revokes, denials by reason code, quarantine, fail-closed). Use for dashboards or alerting. Requires gateway auth.
 - **Structured logs:** Each consent decision (issue, consume, deny, revoke) is logged as JSON by the `consentgate` subsystem so log aggregators can query by `eventType`, `reasonCode`, `sessionKey`, or `correlationId`.
+
+## Enterprise ConsentGate
+
+- **Enforce mode:** Set `gateway.consentGate.observeOnly: false` so that gated tools are blocked without a valid token. Use after validating behavior in observe-only mode.
+- **Trust tier mapping:** Use `gateway.consentGate.trustTierDefault` and `gateway.consentGate.trustTierMapping` to map session key prefixes (e.g. `"telegram:"`, `"discord:"`) to tiers; combine with `tierToolMatrix` to restrict which tools each tier can use.
+- **Audit:** Enable `gateway.consentGate.audit` (see above) for a continuous audit stream. ConsentGate does not replace exec approvals: exec approvals gate shell execution; ConsentGate gates high-risk tool invocations (exec, write, gateway, etc.) with tokens and WAL.
 
 ## Deny storm
 

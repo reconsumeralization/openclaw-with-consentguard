@@ -139,6 +139,8 @@ export type GatewayTailscaleConfig = {
   mode?: GatewayTailscaleMode;
   /** Reset serve/funnel configuration on shutdown. */
   resetOnExit?: boolean;
+  /** Optional hostname for serve/funnel (e.g. openclaw-enterprise-gateway). */
+  hostname?: string;
 };
 
 export type GatewayRemoteConfig = {
@@ -305,6 +307,17 @@ export type ConsentGateConfig = {
     quarantineThreshold?: number;
     /** When auto-quarantining, revoke all issued tokens for that session (default: true). */
     cascadeRevokeOnQuarantine?: boolean;
+  };
+  /** Consent decision engine: native in-process (default) or external service (future). */
+  provider?: "native" | "external";
+  /** Enterprise audit: emit consent events to a destination for SIEM/compliance. */
+  audit?: {
+    /** Enable audit stream (default: false). */
+    enabled?: boolean;
+    /** Where to write: "stdout" or a file path. */
+    destination?: string;
+    /** Redact secrets from audit output (default: true when audit enabled). */
+    redactSecrets?: boolean;
   };
 };
 

@@ -55,6 +55,16 @@ export const FIELD_HELP: Record<string, string> = {
     "When true, log consent decisions only; do not block execution (default: true for safe rollout).",
   "gateway.consentGate.storagePath":
     "Directory for ConsentGate token state and WAL (optional; default under state dir).",
+  "gateway.consentGate.provider":
+    "Consent decision engine: native (in-process) or external (future). Default: native.",
+  "gateway.consentGate.audit.enabled":
+    "Emit consent events to an audit destination for SIEM/compliance (default: false).",
+  "gateway.consentGate.audit.destination":
+    "Audit output: stdout or a file path.",
+  "gateway.consentGate.audit.redactSecrets":
+    "Redact secrets from audit output (default: true when audit enabled).",
+  "gateway.tailscale.hostname":
+    "Optional hostname for Tailscale serve/funnel (e.g. openclaw-enterprise-gateway).",
   "nodeHost.browserProxy.enabled": "Expose the local browser control server via node proxy.",
   "nodeHost.browserProxy.allowProfiles":
     "Optional allowlist of browser profile names exposed via the node proxy.",

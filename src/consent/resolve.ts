@@ -13,7 +13,7 @@ import { createFileBackedTokenStore } from "./store-file.js";
 import type { TokenStore } from "./store.js";
 import { createInMemoryTokenStore } from "./store.js";
 import { createFileBackedWal } from "./wal-file.js";
-import type { WalWriter } from "./wal.js";
+import { createAuditForwardingWal, type WalWriter } from "./wal.js";
 import { createInMemoryWal } from "./wal.js";
 
 /** Default tool/command names that require consent when ConsentGate is enabled. */
@@ -44,9 +44,17 @@ let cachedRuntime: {
 function configKey(cfg: OpenClawConfig): string {
   const cg = cfg.gateway?.consentGate;
   if (!cg?.enabled) return "off";
-  return ["on", cg.observeOnly ?? true, (cg.gatedTools ?? []).join(","), cg.storagePath ?? ""].join(
-    "|",
-  );
+  const auditKey =
+    cg.audit?.enabled && cg.audit.destination?.trim()
+      ? `audit:${cg.audit.destination.trim()}:${cg.audit.redactSecrets ?? true}`
+      : "no-audit";
+  return [
+    "on",
+    cg.observeOnly ?? true,
+    (cg.gatedTools ?? []).join(","),
+    cg.storagePath ?? "",
+    auditKey,
+  ].join("|");
 }
 
 function runtimeStateKey(storagePath: string | undefined): string {
@@ -96,6 +104,13 @@ export function resolveConsentGateApi(cfg: OpenClawConfig): ConsentGateApi {
     return cachedApi;
   }
   const runtime = resolveRuntimeState(cg.storagePath);
+  let wal: WalWriter = runtime.wal;
+  if (cg.audit?.enabled && cg.audit.destination?.trim()) {
+    wal = createAuditForwardingWal(runtime.wal, {
+      destination: cg.audit.destination.trim(),
+      redactSecrets: cg.audit.redactSecrets ?? true,
+    });
+  }
   const tierToolMatrix =
     cg.tierToolMatrix && typeof cg.tierToolMatrix === "object" ? cg.tierToolMatrix : undefined;
   const rateLimit =
@@ -108,7 +123,7 @@ export function resolveConsentGateApi(cfg: OpenClawConfig): ConsentGateApi {
       : undefined;
   const engine = createConsentEngine({
     store: runtime.store,
-    wal: runtime.wal,
+    wal,
     policyVersion: POLICY_VERSION,
     metrics: runtime.metrics,
     quarantine: runtime.quarantine,
