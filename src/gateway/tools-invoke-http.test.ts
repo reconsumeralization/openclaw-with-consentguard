@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/types.js";
 import { resolveConsentGateApi } from "../consent/resolve.js";
+import { CONSENT_REASON } from "../consent/reason-codes.js";
 
 const TEST_GATEWAY_TOKEN = "test-gateway-token-1234567890";
 
@@ -251,6 +252,30 @@ const invokeToolAuthed = async (params: {
     headers: gatewayAuthHeaders(),
     ...params,
   });
+
+const buildConsentContextHash = (params: {
+  tool: string;
+  sessionKey: string;
+  args: Record<string, unknown>;
+  messageChannel?: string | null;
+  accountId?: string | null;
+}) =>
+  createHash("sha256")
+    .update(
+      JSON.stringify({
+        tool: params.tool,
+        sessionKey: params.sessionKey,
+        messageChannel: params.messageChannel ?? null,
+        accountId: params.accountId ?? null,
+        args: Object.keys(params.args)
+          .sort()
+          .reduce<Record<string, unknown>>((acc, k) => {
+            acc[k] = params.args[k];
+            return acc;
+          }, {}),
+      }),
+    )
+    .digest("hex");
 
 describe("POST /tools/invoke", () => {
   it("invokes a tool and returns {ok:true,result}", async () => {

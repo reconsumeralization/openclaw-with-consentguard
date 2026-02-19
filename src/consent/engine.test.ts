@@ -63,6 +63,19 @@ describe("ConsentGate engine", () => {
     expect(result.reasonCode).toBe(CONSENT_REASON.TOKEN_NOT_FOUND);
   });
 
+  it("denies consume when jti is missing", async () => {
+    const api = createEngine();
+    const result = await api.consume({
+      jti: "",
+      tool: "exec",
+      trustTier: "T0",
+      sessionKey: "main",
+      contextHash: "x",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reasonCode).toBe(CONSENT_REASON.NO_TOKEN);
+  });
+
   it("denies consume when context hash mismatch", async () => {
     const api = createEngine();
     const token = await api.issue({
@@ -85,6 +98,55 @@ describe("ConsentGate engine", () => {
     });
     expect(result.allowed).toBe(false);
     expect(result.reasonCode).toBe(CONSENT_REASON.CONTEXT_MISMATCH);
+  });
+
+  it("denies consume when trust tier mismatches token", async () => {
+    const api = createEngine();
+    const token = await api.issue({
+      tool: "exec",
+      trustTier: "T0",
+      sessionKey: "main",
+      contextHash: "abc",
+      ttlMs: 60_000,
+      issuedBy: "op",
+      policyVersion,
+    });
+    expect(token).not.toBeNull();
+
+    const result = await api.consume({
+      jti: token!.jti,
+      tool: "exec",
+      trustTier: "T1",
+      sessionKey: "main",
+      contextHash: "abc",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reasonCode).toBe(CONSENT_REASON.TIER_VIOLATION);
+  });
+
+  it("denies consume when token expired", async () => {
+    const api = createEngine();
+    const token = await api.issue({
+      tool: "exec",
+      trustTier: "T0",
+      sessionKey: "main",
+      contextHash: "abc",
+      ttlMs: 1,
+      issuedBy: "op",
+      policyVersion,
+    });
+    expect(token).not.toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const result = await api.consume({
+      jti: token!.jti,
+      tool: "exec",
+      trustTier: "T0",
+      sessionKey: "main",
+      contextHash: "abc",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reasonCode).toBe(CONSENT_REASON.TOKEN_EXPIRED);
   });
 
   it("evaluate does not consume token", async () => {
