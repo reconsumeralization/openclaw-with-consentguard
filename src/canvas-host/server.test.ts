@@ -264,8 +264,14 @@ describe("canvas host", () => {
       createdBundle = true;
     }
 
-    await fs.symlink(path.join(process.cwd(), "package.json"), linkPath);
-    createdLink = true;
+    try {
+      await fs.symlink(path.join(process.cwd(), "package.json"), linkPath);
+      createdLink = true;
+    } catch (err) {
+      if (!(process.platform === "win32" && (err as NodeJS.ErrnoException).code === "EPERM")) {
+        throw err;
+      }
+    }
 
     const server = await startCanvasHost({
       runtime: quietRuntime,
@@ -293,9 +299,11 @@ describe("canvas host", () => {
       );
       expect(traversalRes.status).toBe(404);
       expect(await traversalRes.text()).toBe("not found");
-      const symlinkRes = await fetch(`http://127.0.0.1:${server.port}${A2UI_PATH}/${linkName}`);
-      expect(symlinkRes.status).toBe(404);
-      expect(await symlinkRes.text()).toBe("not found");
+      if (createdLink) {
+        const symlinkRes = await fetch(`http://127.0.0.1:${server.port}${A2UI_PATH}/${linkName}`);
+        expect(symlinkRes.status).toBe(404);
+        expect(await symlinkRes.text()).toBe("not found");
+      }
     } finally {
       await server.close();
       if (createdLink) {

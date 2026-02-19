@@ -1056,10 +1056,16 @@ describe("QmdMemoryManager", () => {
     const target = path.join(workspaceDir, "target.md");
     await fs.writeFile(target, "ok", "utf-8");
     const link = path.join(workspaceDir, "link.md");
-    await fs.symlink(target, link);
-    await expect(manager.readFile({ relPath: "qmd/workspace-main/link.md" })).rejects.toThrow(
-      "path required",
-    );
+    try {
+      await fs.symlink(target, link);
+      await expect(manager.readFile({ relPath: "qmd/workspace-main/link.md" })).rejects.toThrow(
+        "path required",
+      );
+    } catch (err) {
+      if (!(process.platform === "win32" && (err as NodeJS.ErrnoException).code === "EPERM")) {
+        throw err;
+      }
+    }
 
     await manager.close();
   });
@@ -1366,7 +1372,7 @@ describe("QmdMemoryManager", () => {
       const stat = await fs.lstat(customModelsDir);
       expect(stat.isSymbolicLink()).toBe(true);
       const target = await fs.readlink(customModelsDir);
-      expect(target).toBe(defaultModelsDir);
+      expect(path.resolve(target)).toBe(path.resolve(defaultModelsDir));
 
       // Models are accessible through the symlink.
       const content = await fs.readFile(path.join(customModelsDir, "model.bin"), "utf-8");

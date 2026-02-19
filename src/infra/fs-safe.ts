@@ -35,6 +35,23 @@ const isNotFoundError = (err: unknown) =>
 const isSymlinkOpenError = (err: unknown) =>
   isNodeError(err) && (err.code === "ELOOP" || err.code === "EINVAL" || err.code === "ENOTSUP");
 
+const hasComparableIdentity = (value: number | bigint) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value !== 0;
+  }
+  return value !== 0n;
+};
+
+const fileIdentityMismatched = (a: Stats, b: Stats) => {
+  if (hasComparableIdentity(a.ino) && hasComparableIdentity(b.ino) && a.ino !== b.ino) {
+    return true;
+  }
+  if (hasComparableIdentity(a.dev) && hasComparableIdentity(b.dev) && a.dev !== b.dev) {
+    return true;
+  }
+  return false;
+};
+
 export async function openFileWithinRoot(params: {
   rootDir: string;
   relativePath: string;
@@ -87,7 +104,9 @@ export async function openFileWithinRoot(params: {
     }
 
     const realStat = await fs.stat(realPath);
-    if (stat.ino !== realStat.ino || stat.dev !== realStat.dev) {
+    // Windows may report dev=0 for path-based stat while handle-based stat has a real device id.
+    // Compare only identity parts that are meaningfully populated on both sides.
+    if (fileIdentityMismatched(stat, realStat)) {
       throw new SafeOpenError("invalid-path", "path mismatch");
     }
 

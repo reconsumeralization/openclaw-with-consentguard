@@ -77,7 +77,14 @@ describe("validateBindMounts", () => {
   it("blocks symlink escapes into blocked directories", () => {
     const dir = mkdtempSync(join(tmpdir(), "openclaw-sbx-"));
     const link = join(dir, "etc-link");
-    symlinkSync("/etc", link);
+    try {
+      symlinkSync("/etc", link);
+    } catch (err) {
+      if (process.platform === "win32" && (err as NodeJS.ErrnoException).code === "EPERM") {
+        return;
+      }
+      throw err;
+    }
     const run = () => validateBindMounts([`${link}/passwd:/mnt/passwd:ro`]);
 
     if (process.platform === "win32") {

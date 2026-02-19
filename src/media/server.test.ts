@@ -34,6 +34,7 @@ async function waitForFileRemoval(filePath: string, maxTicks = 1000) {
 describe("media server", () => {
   let server: Awaited<ReturnType<typeof startMediaServer>>;
   let port = 0;
+  let symlinkSupported = true;
 
   beforeAll(async () => {
     MEDIA_DIR = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-media-test-"));
@@ -85,11 +86,23 @@ describe("media server", () => {
       setup: async () => {
         const target = path.join(process.cwd(), "package.json"); // outside MEDIA_DIR
         const link = path.join(MEDIA_DIR, "link-out");
-        await fs.symlink(target, link);
+        try {
+          await fs.symlink(target, link);
+          symlinkSupported = true;
+        } catch (err) {
+          if (process.platform === "win32" && (err as NodeJS.ErrnoException).code === "EPERM") {
+            symlinkSupported = false;
+            return;
+          }
+          throw err;
+        }
       },
     },
   ] as const)("$testName", async (testCase) => {
     await testCase.setup?.();
+    if (testCase.mediaPath === "link-out" && !symlinkSupported) {
+      return;
+    }
     const res = await fetch(`http://127.0.0.1:${port}/media/${testCase.mediaPath}`);
     expect(res.status).toBe(400);
     expect(await res.text()).toBe("invalid path");
