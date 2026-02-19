@@ -88,6 +88,7 @@ The `sector_intelligence_track` tool tracks sector-specific attack patterns:
 - Ransomware attacks
 
 **Defensive Controls:**
+
 - Secure policy and claims systems
 - MFA for all accounts
 - Monitor customer data access
@@ -97,6 +98,7 @@ The `sector_intelligence_track` tool tracks sector-specific attack patterns:
 ### Aviation
 
 **Attack Vectors:**
+
 - Flight operations system compromise
 - Critical infrastructure access
 - Pre-positioning for kinetic operations
@@ -104,6 +106,7 @@ The `sector_intelligence_track` tool tracks sector-specific attack patterns:
 - Supply chain attacks
 
 **Defensive Controls:**
+
 - Secure flight operations systems
 - OT/ICS security controls
 - Monitor for pre-positioning activity
@@ -113,6 +116,7 @@ The `sector_intelligence_track` tool tracks sector-specific attack patterns:
 ### Healthcare
 
 **Attack Vectors:**
+
 - Patient data theft
 - Medical device compromise
 - Ransomware attacks
@@ -120,6 +124,7 @@ The `sector_intelligence_track` tool tracks sector-specific attack patterns:
 - Hospital operations disruption
 
 **Defensive Controls:**
+
 - Secure patient data systems
 - HIPAA compliance
 - Secure medical devices
@@ -129,6 +134,7 @@ The `sector_intelligence_track` tool tracks sector-specific attack patterns:
 ### Financial
 
 **Attack Vectors:**
+
 - Banking system compromise
 - Payment processing attacks
 - Cryptocurrency theft
@@ -136,6 +142,7 @@ The `sector_intelligence_track` tool tracks sector-specific attack patterns:
 - ATM attacks
 
 **Defensive Controls:**
+
 - Banking security controls
 - Secure payment processing
 - Monitor SWIFT network
