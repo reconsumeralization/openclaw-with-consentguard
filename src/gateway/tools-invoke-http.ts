@@ -345,24 +345,25 @@ export async function handleToolsInvokeHttpRequest(
         await consentApi.evaluate(consumeInput);
       } else {
         const result = await consentApi.consume(consumeInput);
-          if (!result.allowed) {
-            const deny = buildConsentDenyPayload({
-              reasonCode: result.reasonCode,
-              correlationId: result.correlationId ?? correlationId,
-              tool: toolName,
-              sessionKey,
-              trustTier: consumeInput.trustTier,
-              jti: consentTokenJti ?? null,
-            });
-            sendJson(res, 403, {
-              ok: false,
-              error: {
-                type: "consent_denied",
-                ...deny,
-              },
-            });
-            return true;
-          }
+        const result = await consentApi.consume(consumeInput);
+        if (!result.allowed) {
+          const deny = buildConsentDenyPayload({
+            reasonCode: result.reasonCode,
+            correlationId: result.correlationId ?? correlationId,
+            tool: toolName,
+            sessionKey,
+            trustTier: consumeInput.trustTier,
+            jti: consentTokenJti ?? null,
+          });
+          sendJson(res, 403, {
+            ok: false,
+            error: {
+              type: "consent_denied",
+              ...deny,
+            },
+          });
+          return true;
+        }
         }
       } catch (err) {
         logWarn(`ConsentGate error for ${toolName}: ${String(err)}`);
