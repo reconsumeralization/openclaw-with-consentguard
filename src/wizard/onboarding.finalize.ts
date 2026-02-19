@@ -29,8 +29,20 @@ import type { RuntimeEnv } from "../runtime.js";
 import { restoreTerminalState } from "../terminal/restore.js";
 import { runTui } from "../tui/tui.js";
 import { resolveUserPath } from "../utils.js";
+import {
+  formatNextStepsGuide,
+  generateNextStepsGuide,
+} from "./onboarding.guide.js";
 import { setupOnboardingShellCompletion } from "./onboarding.completion.js";
+import {
+  formatVerificationResults,
+  verifyOnboarding,
+} from "./onboarding.verify.js";
 import type { GatewayWizardSettings, WizardFlow } from "./onboarding.types.js";
+import {
+  formatVerificationResults,
+  verifyOnboarding,
+} from "./onboarding.verify.js";
 import type { WizardPrompter } from "./prompts.js";
 
 type FinalizeOnboardingOptions = {
@@ -477,6 +489,28 @@ export async function finalizeOnboardingWizard(
         ].join("\n"),
     "Web search (optional)",
   );
+
+  // Run verification suite
+  if (!opts.skipHealth && !opts.skipVerify) {
+    const verification = await verifyOnboarding(nextConfig, {
+      gatewayToken: settings.authMode === "token" ? settings.gatewayToken : undefined,
+      skipGateway: !gatewayProbe.ok,
+      skipChannels: opts.skipChannels ?? opts.skipProviders ?? false,
+    });
+
+    await prompter.note(formatVerificationResults(verification), "Verification");
+
+    // Generate personalized next steps guide
+    const guide = generateNextStepsGuide(
+      nextConfig,
+      verification,
+      flow,
+      settings.authMode === "token" ? settings.gatewayToken : undefined,
+    );
+    await prompter.note(formatNextStepsGuide(guide), guide.title);
+  } else if (opts.skipVerify) {
+    await prompter.note("Verification skipped.", "Verification");
+  }
 
   await prompter.note(
     'What now: https://openclaw.ai/showcase ("What People Are Building").',

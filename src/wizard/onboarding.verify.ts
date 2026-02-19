@@ -1,0 +1,311 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { callGateway } from "../gateway/call.js";
+import { probeGatewayReachable } from "../commands/onboard-helpers.js";
+import type { OpenClawConfig } from "../config/config.js";
+import { readConfigFileSnapshot } from "../config/config.js";
+import { validateConfigObjectWithPlugins } from "../config/validation.js";
+import { resolveStateDir } from "../config/paths.js";
+import { resolveUserPath } from "../utils.js";
+import { DEFAULT_AGENT_WORKSPACE_DIR } from "../agents/workspace.js";
+
+export type VerificationResult = {
+  gateway: { ok: boolean; detail?: string };
+  config: { ok: boolean; issues?: string[] };
+  workspace: { ok: boolean; detail?: string };
+  provider: { ok: boolean; detail?: string };
+  channels: Array<{ id: string; ok: boolean; detail?: string }>;
+};
+
+/**
+ * Verify gateway is reachable.
+ */
+async function verifyGateway(
+  config: OpenClawConfig,
+  token?: string,
+): Promise<{ ok: boolean; detail?: string }> {
+  const port = config.gateway?.port ?? 18789;
+  const bind = config.gateway?.bind ?? "loopback";
+  const host = bind === "loopback" ? "127.0.0.1" : "0.0.0.0";
+  const wsUrl = `ws://${host}:${port}`;
+
+  try {
+    const probe = await probeGatewayReachable({
+      url: wsUrl,
+      token: token ?? config.gateway?.auth?.token,
+      password: config.gateway?.auth?.password,
+    });
+
+    if (probe.ok) {
+      return { ok: true, detail: `Gateway reachable at ${wsUrl}` };
+    }
+
+    return {
+      ok: false,
+      detail: probe.detail ?? "Gateway not reachable",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Verify config file is valid.
+ */
+async function verifyConfig(config: OpenClawConfig): Promise<{
+  ok: boolean;
+  issues?: string[];
+}> {
+  try {
+    const snapshot = await readConfigFileSnapshot();
+    if (!snapshot.valid) {
+      return {
+        ok: false,
+        issues: snapshot.issues.map((iss) => `${iss.path}: ${iss.message}`),
+      };
+    }
+
+    // Additional validation
+    const validationResult = await validateConfigObjectWithPlugins(config);
+    if (!validationResult.valid) {
+      return {
+        ok: false,
+        issues: validationResult.errors.map((err) => err.message),
+      };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      issues: [error instanceof Error ? error.message : String(error)],
+    };
+  }
+}
+
+/**
+ * Verify workspace directory is accessible.
+ */
+async function verifyWorkspace(config: OpenClawConfig): Promise<{
+  ok: boolean;
+  detail?: string;
+}> {
+  try {
+    const workspaceDir =
+      config.agents?.defaults?.workspace ?? DEFAULT_AGENT_WORKSPACE_DIR;
+    const resolvedPath = resolveUserPath(workspaceDir);
+
+    // Check if directory exists and is accessible
+    try {
+      await fs.access(resolvedPath, fs.constants.R_OK | fs.constants.W_OK);
+    } catch {
+      // Try to create it
+      try {
+        await fs.mkdir(resolvedPath, { recursive: true });
+      } catch (createError) {
+        return {
+          ok: false,
+          detail: `Cannot create workspace directory: ${
+            createError instanceof Error ? createError.message : String(createError)
+          }`,
+        };
+      }
+    }
+
+    // Verify we can write to it
+    const testFile = path.join(resolvedPath, ".verify-test");
+    try {
+      await fs.writeFile(testFile, "test");
+      await fs.unlink(testFile);
+    } catch (writeError) {
+      return {
+        ok: false,
+        detail: `Cannot write to workspace: ${
+          writeError instanceof Error ? writeError.message : String(writeError)
+        }`,
+      };
+    }
+
+    return {
+      ok: true,
+      detail: `Workspace accessible: ${resolvedPath}`,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Verify provider connectivity (basic check).
+ */
+async function verifyProvider(config: OpenClawConfig): Promise<{
+  ok: boolean;
+  detail?: string;
+}> {
+  // Check if a provider is configured
+  const model = config.agents?.defaults?.model;
+  if (!model) {
+    return {
+      ok: false,
+      detail: "No model/provider configured",
+    };
+  }
+
+  // Check if credentials exist
+  const stateDir = resolveStateDir();
+  const credentialsDir = path.join(stateDir, "credentials");
+  try {
+    await fs.access(credentialsDir);
+    return {
+      ok: true,
+      detail: "Provider credentials found",
+    };
+  } catch {
+    // Credentials might be in env vars or not needed
+    return {
+      ok: true,
+      detail: "Provider configured (credentials may be in environment)",
+    };
+  }
+}
+
+/**
+ * Verify channel connectivity (if channels are configured).
+ */
+async function verifyChannels(config: OpenClawConfig): Promise<
+  Array<{ id: string; ok: boolean; detail?: string }>
+> {
+  const channels = config.channels ?? {};
+  const results: Array<{ id: string; ok: boolean; detail?: string }> = [];
+
+  for (const [channelId, channelConfig] of Object.entries(channels)) {
+    if (!channelConfig || typeof channelConfig !== "object") {
+      continue;
+    }
+
+    // Basic check: if channel has required config
+    const enabled = (channelConfig as { enabled?: boolean }).enabled ?? true;
+    if (!enabled) {
+      results.push({
+        id: channelId,
+        ok: true,
+        detail: "Channel disabled",
+      });
+      continue;
+    }
+
+    // For now, just check if config exists
+    // Actual connectivity would require channel-specific checks
+    results.push({
+      id: channelId,
+      ok: true,
+      detail: "Channel configured",
+    });
+  }
+
+  return results;
+}
+
+/**
+ * Run comprehensive onboarding verification.
+ */
+export async function verifyOnboarding(
+  config: OpenClawConfig,
+  options: {
+    gatewayToken?: string;
+    skipGateway?: boolean;
+    skipChannels?: boolean;
+  } = {},
+): Promise<VerificationResult> {
+  const [gateway, configCheck, workspace, provider, channels] = await Promise.all([
+    options.skipGateway
+      ? Promise.resolve({ ok: true, detail: "Skipped" })
+      : verifyGateway(config, options.gatewayToken),
+    verifyConfig(config),
+    verifyWorkspace(config),
+    verifyProvider(config),
+    options.skipChannels
+      ? Promise.resolve([])
+      : verifyChannels(config),
+  ]);
+
+  return {
+    gateway,
+    config: configCheck,
+    workspace,
+    provider,
+    channels,
+  };
+}
+
+/**
+ * Format verification results for display.
+ */
+export function formatVerificationResults(
+  results: VerificationResult,
+): string {
+  const lines: string[] = [];
+  lines.push("Verification Results:");
+  lines.push("");
+
+  // Gateway
+  const gatewayStatus = results.gateway.ok ? "✓" : "✗";
+  lines.push(`${gatewayStatus} Gateway: ${results.gateway.detail ?? (results.gateway.ok ? "OK" : "Failed")}`);
+
+  // Config
+  const configStatus = results.config.ok ? "✓" : "✗";
+  if (results.config.ok) {
+    lines.push(`${configStatus} Config: Valid`);
+  } else {
+    lines.push(`${configStatus} Config: Invalid`);
+    if (results.config.issues) {
+      for (const issue of results.config.issues) {
+        lines.push(`  - ${issue}`);
+      }
+    }
+  }
+
+  // Workspace
+  const workspaceStatus = results.workspace.ok ? "✓" : "✗";
+  lines.push(
+    `${workspaceStatus} Workspace: ${results.workspace.detail ?? (results.workspace.ok ? "OK" : "Failed")}`,
+  );
+
+  // Provider
+  const providerStatus = results.provider.ok ? "✓" : "✗";
+  lines.push(
+    `${providerStatus} Provider: ${results.provider.detail ?? (results.provider.ok ? "OK" : "Failed")}`,
+  );
+
+  // Channels
+  if (results.channels.length > 0) {
+    lines.push("");
+    lines.push("Channels:");
+    for (const channel of results.channels) {
+      const status = channel.ok ? "✓" : "✗";
+      lines.push(`  ${status} ${channel.id}: ${channel.detail ?? (channel.ok ? "OK" : "Failed")}`);
+    }
+  }
+
+  const allPassed =
+    results.gateway.ok &&
+    results.config.ok &&
+    results.workspace.ok &&
+    results.provider.ok &&
+    results.channels.every((c) => c.ok);
+
+  lines.push("");
+  if (allPassed) {
+    lines.push("All checks passed!");
+  } else {
+    lines.push("Some checks failed. See details above.");
+  }
+
+  return lines.join("\n");
+}

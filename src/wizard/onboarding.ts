@@ -15,6 +15,7 @@ import {
 import type { RuntimeEnv } from "../runtime.js";
 import { defaultRuntime } from "../runtime.js";
 import { resolveUserPath } from "../utils.js";
+import { withErrorRecovery } from "./onboarding.recovery.js";
 import type { QuickstartGatewayDefaults, WizardFlow } from "./onboarding.types.js";
 import { WizardCancelledError, type WizardPrompter } from "./prompts.js";
 
@@ -412,21 +413,28 @@ export async function runOnboardingWizard(
   if (opts.skipChannels ?? opts.skipProviders) {
     await prompter.note("Skipping channel setup.", "Channels");
   } else {
-    const { listChannelPlugins } = await import("../channels/plugins/index.js");
-    const { setupChannels } = await import("../commands/onboard-channels.js");
-    const quickstartAllowFromChannels =
-      flow === "quickstart"
-        ? listChannelPlugins()
-            .filter((plugin) => plugin.meta.quickstartAllowFrom)
-            .map((plugin) => plugin.id)
-        : [];
-    nextConfig = await setupChannels(nextConfig, runtime, prompter, {
-      allowSignalInstall: true,
-      forceAllowFromChannels: quickstartAllowFromChannels,
-      skipDmPolicyPrompt: flow === "quickstart",
-      skipConfirm: flow === "quickstart",
-      quickstartDefaults: flow === "quickstart",
-    });
+    await withErrorRecovery(
+      "Channel setup",
+      async () => {
+        const { listChannelPlugins } = await import("../channels/plugins/index.js");
+        const { setupChannels } = await import("../commands/onboard-channels.js");
+        const quickstartAllowFromChannels =
+          flow === "quickstart"
+            ? listChannelPlugins()
+                .filter((plugin) => plugin.meta.quickstartAllowFrom)
+                .map((plugin) => plugin.id)
+            : [];
+        nextConfig = await setupChannels(nextConfig, runtime, prompter, {
+          allowSignalInstall: true,
+          forceAllowFromChannels: quickstartAllowFromChannels,
+          skipDmPolicyPrompt: flow === "quickstart",
+          skipConfirm: flow === "quickstart",
+          quickstartDefaults: flow === "quickstart",
+        });
+      },
+      prompter,
+      runtime,
+    );
   }
 
   await writeConfigFile(nextConfig);
@@ -439,13 +447,42 @@ export async function runOnboardingWizard(
   if (opts.skipSkills) {
     await prompter.note("Skipping skills setup.", "Skills");
   } else {
-    const { setupSkills } = await import("../commands/onboard-skills.js");
-    nextConfig = await setupSkills(nextConfig, workspaceDir, runtime, prompter);
+    await withErrorRecovery(
+      "Skills setup",
+      async () => {
+        const { setupSkills } = await import("../commands/onboard-skills.js");
+        nextConfig = await setupSkills(nextConfig, workspaceDir, runtime, prompter);
+      },
+      prompter,
+      runtime,
+    );
   }
 
   // Setup hooks (session memory on /new)
-  const { setupInternalHooks } = await import("../commands/onboard-hooks.js");
-  nextConfig = await setupInternalHooks(nextConfig, runtime, prompter);
+  await withErrorRecovery(
+    "Hooks setup",
+    async () => {
+      const { setupInternalHooks } = await import("../commands/onboard-hooks.js");
+      nextConfig = await setupInternalHooks(nextConfig, runtime, prompter);
+    },
+    prompter,
+    runtime,
+  );
+
+  // Setup security features
+  if (!opts.skipSecurity) {
+    await withErrorRecovery(
+      "Security setup",
+      async () => {
+        const { setupSecurityInteractive } = await import("../commands/onboard-security.js");
+        nextConfig = await setupSecurityInteractive(nextConfig, runtime, prompter);
+      },
+      prompter,
+      runtime,
+    );
+  } else {
+    await prompter.note("Skipping security setup.", "Security");
+  }
 
   nextConfig = onboardHelpers.applyWizardMetadata(nextConfig, { command: "onboard", mode });
   await writeConfigFile(nextConfig);
