@@ -4,6 +4,16 @@
 - **Program track:** AI Agent Evaluation and Cybersecurity
 - **Status (as of February 19, 2026):** no open opportunities listed; prior rounds closed on January 31, 2025
 - **Updates:** [aisfund.org/contact-us](https://aisfund.org/contact-us/)
+- **ConsentGate implementation status:** Mode A in production; durable store, live Control UI, observability, tier/rate-limit policy, and quarantine lift API implemented.
+
+---
+
+## Placeholders (fill or mark TBD before submission)
+
+- **[Host organization]:** TBD
+- **[PI and contributors]:** TBD
+- **[Budget]:** TBD
+- **[Timeline]:** TBD
 
 ---
 

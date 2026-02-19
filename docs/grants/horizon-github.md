@@ -2,6 +2,8 @@
 
 Enhanced notes for two additional streams; full applications depend on specific calls and programme rules.
 
+- **ConsentGate implementation status:** Mode A in production; durable store, live Control UI, observability, tier/rate-limit policy, and quarantine lift API implemented.
+
 ---
 
 ## Horizon Europe (EU)

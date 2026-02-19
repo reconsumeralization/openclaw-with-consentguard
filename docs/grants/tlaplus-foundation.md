@@ -5,6 +5,16 @@
 - **Apply:** [Application template (Google Doc)](https://docs.google.com/document/d/17OF2InWnwELb1NzwamyXsfglu1F57JGfYra1lsodmF0/edit) and submit via form on foundation site. Contact: <grants@tlapl.us>
 
 - **Eligibility:** Researchers and practitioners (industry and academia); must accept unrestricted grant, no conflicting obligations, in a location where U.S. participation is permitted. New software: Apache 2.0, 2-Clause BSD, or MIT preferred.
+- **ConsentGate implementation status:** Mode A in production; durable store, live Control UI, observability, tier/rate-limit policy, and quarantine lift API implemented. TLA+ spec and conformance work proposed in this application.
+
+---
+
+## Placeholders (fill or mark TBD before submission)
+
+- **[Host organization]:** TBD (if required)
+- **[PI and contributors]:** David Weatherspoon (lead); TBD others
+- **[Budget]:** TBD (e.g. within $1K–$100K range)
+- **[Timeline]:** Example 4 months in draft; adjust per application
 
 ---
 

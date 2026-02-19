@@ -6,6 +6,16 @@
 - **Apply:** [Airtable application form](https://airtable.com/appyVXc5SMPAvIKpP/pagnX5sphV5gw8CVF/form)
 - **Focus areas (relevant):** Security technologies for AI systems (e.g. formal verification, red-teaming); Safe multi-agent scenarios and AI agent coordination.
 - **Eligibility:** Individuals, teams; nonprofit and for-profit.
+- **ConsentGate implementation status:** Mode A in production; durable store, live Control UI, observability, tier/rate-limit policy, and quarantine lift API implemented.
+
+---
+
+## Placeholders (fill or mark TBD before submission)
+
+- **[Host organization]:** TBD (if required by program)
+- **[PI and contributors]:** David Weatherspoon (lead); TBD others
+- **[Budget]:** TBD (e.g. $75K–$150K; scale as needed)
+- **[Timeline]:** 6–12 months; TBD milestones per form
 
 ---
 

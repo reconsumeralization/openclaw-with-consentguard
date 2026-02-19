@@ -5,6 +5,16 @@
 - **Status (as of February 19, 2026):** "We are not currently accepting applications" per the grants page
 - **Eligibility model:** UK host organization required; international collaborators allowed
 - **Contact:** <AISIgrants@dsit.gov.uk>
+- **ConsentGate implementation status:** Mode A in production; durable store, live Control UI, observability, tier/rate-limit policy, and quarantine lift API implemented.
+
+---
+
+## Placeholders (fill or mark TBD before submission)
+
+- **[Host organization]:** UK host required; TBD
+- **[PI and contributors]:** TBD
+- **[Budget]:** TBD
+- **[Timeline]:** TBD
 
 ---
 

@@ -41,10 +41,12 @@ Checked on February 19, 2026.
 
 ## Placeholders to fill before submission
 
-- `[Host organization]`: legal entity that can receive funds for the specific program.
-- `[PI and contributors]`: names, roles, affiliations.
-- `[Budget]`: personnel, infrastructure, and dissemination.
-- `[Timeline]`: milestones that match the target program period.
+- `[Host organization]`: legal entity that can receive funds for the specific program. Fill or mark TBD in each draft.
+- `[PI and contributors]`: names, roles, affiliations. Fill or mark TBD per program.
+- `[Budget]`: personnel, infrastructure, and dissemination. Fill or mark TBD per program.
+- `[Timeline]`: milestones that match the target program period. Fill or mark TBD per program.
+
+Re-check funder program pages for current deadlines before submitting; update the table above and any draft "next steps" or deadline text accordingly.
 
 ## Engineering plan
 

@@ -5,6 +5,16 @@
 - **Deadlines (check current solicitation):** Preliminary proposal — typically January (e.g. Jan 14, 5pm submitter local); Full proposal — by invitation only, typically April (e.g. Apr 22, 5pm submitter local)
 - **Focus:** Safety, security, and/or privacy for **mature, established open-source ecosystems** with existing managing organisations. **Implementation-oriented** (not research-only).
 - **Eligibility:** U.S. institutions; see solicitation for PI/co-PI and organisation rules.
+- **ConsentGate implementation status:** Mode A in production; durable store, live Control UI, observability, tier/rate-limit policy, and quarantine lift API implemented.
+
+---
+
+## Placeholders (fill or mark TBD before submission)
+
+- **[Host organization]:** Identify U.S. managing organisation (e.g. university, 501(c)(3)) that can receive the award.
+- **[PI and contributors]:** David Weatherspoon — PI; co-PIs/collaborators TBD.
+- **[Budget]:** TBD per solicitation (personnel, travel, equipment, subawards).
+- **[Timeline]:** Align milestones with preliminary (Jan) and full (Apr) proposal cycle; verify current solicitation dates.
 
 ---
 

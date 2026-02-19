@@ -4,6 +4,16 @@
 - **Apply:** [Grant submission form](https://share.hsforms.com/1sZmUUNQLQ0SwlMhrcOs7ww4tvhy). If aligned, you are contacted to develop a Proposal/SOW.
 - **Eligibility:** Standalone projects, foundations covering many projects, core ecosystem services (informed by OpenSSF Securing Critical Projects working group).
 - **Expectations:** Monthly public reports; participation in monthly strategy roundtables; beginning/middle/end blog posts on the work.
+- **ConsentGate implementation status:** Mode A in production; durable store, live Control UI, observability, tier/rate-limit policy, and quarantine lift API implemented.
+
+---
+
+## Placeholders (fill or mark TBD before submission)
+
+- **[Host organization]:** Specify OpenClaw project / foundation / managing organisation that can receive funds and report publicly.
+- **[PI and contributors]:** David Weatherspoon (lead); TBD others.
+- **[Budget]:** TBD per program.
+- **[Timeline]:** TBD milestones.
 
 ---
 
