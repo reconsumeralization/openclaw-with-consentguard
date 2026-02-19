@@ -67,6 +67,7 @@ import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
 import { renderSessions } from "./views/sessions.ts";
+import { renderSecurity } from "./views/security.ts";
 import { renderSkills } from "./views/skills.ts";
 
 const AVATAR_DATA_RE = /^data:/i;
@@ -911,6 +912,20 @@ export function renderApp(state: AppViewState) {
                 onSave: () => saveConfig(state),
                 onApply: () => applyConfig(state),
                 onUpdate: () => runUpdate(state),
+              })
+            : nothing
+        }
+
+        ${
+          state.tab === "security"
+            ? renderSecurity({
+                loading: state.debugLoading,
+                status: state.debugStatus,
+                hello: state.hello,
+                channelsSnapshot: state.channelsSnapshot,
+                devicesList: state.devicesList,
+                connected: state.connected,
+                onRefresh: () => loadDebug(state),
               })
             : nothing
         }

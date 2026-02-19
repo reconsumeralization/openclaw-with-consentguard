@@ -53,7 +53,7 @@ export function startDebugPolling(host: PollingHost) {
     return;
   }
   host.debugPollInterval = window.setInterval(() => {
-    if (host.tab !== "debug") {
+    if (host.tab !== "debug" && host.tab !== "security") {
       return;
     }
     void loadDebug(host as unknown as OpenClawApp);

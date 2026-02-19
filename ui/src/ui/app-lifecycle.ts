@@ -51,7 +51,7 @@ export function handleConnected(host: LifecycleHost) {
   if (host.tab === "logs") {
     startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);
   }
-  if (host.tab === "debug") {
+  if (host.tab === "debug" || host.tab === "security") {
     startDebugPolling(host as unknown as Parameters<typeof startDebugPolling>[0]);
   }
 }
