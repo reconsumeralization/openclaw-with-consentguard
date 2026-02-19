@@ -4,7 +4,7 @@
  * consent.status over the control channel), this view can show real issued/consumed/denied
  * events and allow revoke/quarantine actions. See docs/reference/consentgate-operator-runbook.md.
  */
-import { LitElement, html } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 type RiskLevel = "critical" | "high" | "medium";
@@ -309,6 +309,29 @@ type Notice = {
   text: string;
 };
 
+/** Live API: token row from GET /api/consent/status */
+type LiveTokenRow = {
+  jti: string;
+  status: TokenStatus;
+  tool: string;
+  sessionKey: string;
+  issuedAt: number;
+  expiresAt: number;
+};
+
+/** Live API: WAL event from GET /api/consent/status */
+type LiveWalEventRow = {
+  eventId: string;
+  ts: number;
+  type: string;
+  jti: string | null;
+  tool: string;
+  sessionKey: string;
+  reasonCode: string;
+  decision: string;
+  correlationId?: string;
+};
+
 type AnomalyReason =
   | "context_mismatch"
   | "double_spend"
@@ -435,6 +458,12 @@ class OpenClawConsentDemoElement extends LitElement {
   @state() private quarantinedUntil = 0;
   @state() private quarantineReason: string | null = null;
   @state() private notice: Notice | null = null;
+  /** Live mode: show real gateway consent status from GET /api/consent/status (query param ?live=1). */
+  @state() private liveMode = false;
+  @state() private liveTokens: LiveTokenRow[] = [];
+  @state() private liveEvents: LiveWalEventRow[] = [];
+  @state() private liveLoading = false;
+  @state() private liveError: string | null = null;
 
   private jtiCounter = 0;
   private idempotency = new Map<string, string>();
@@ -446,6 +475,11 @@ class OpenClawConsentDemoElement extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    this.liveMode = params.get("live") === "1";
+    if (this.liveMode) {
+      this.fetchLiveStatus();
+    }
     this.syncTickTimer();
   }
 
@@ -478,6 +512,50 @@ class OpenClawConsentDemoElement extends LitElement {
 
   private setNotice(tone: NoticeTone, text: string): void {
     this.notice = { tone, text };
+  }
+
+  private async fetchLiveStatus(): Promise<void> {
+    this.liveLoading = true;
+    this.liveError = null;
+    try {
+      const res = await fetch("/api/consent/status?limit=100", { credentials: "same-origin" });
+      if (!res.ok) {
+        const t = await res.text();
+        this.liveError = `Status ${res.status}: ${t.slice(0, 200)}`;
+        this.liveTokens = [];
+        this.liveEvents = [];
+        return;
+      }
+      const data = (await res.json()) as { tokens: LiveTokenRow[]; recentEvents: LiveWalEventRow[] };
+      this.liveTokens = data.tokens ?? [];
+      this.liveEvents = data.recentEvents ?? [];
+    } catch (e) {
+      this.liveError = e instanceof Error ? e.message : String(e);
+      this.liveTokens = [];
+      this.liveEvents = [];
+    } finally {
+      this.liveLoading = false;
+    }
+  }
+
+  private async revokeLive(jti: string): Promise<void> {
+    this.liveError = null;
+    try {
+      const res = await fetch("/api/consent/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ jti }),
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        this.liveError = `Revoke failed ${res.status}: ${t.slice(0, 200)}`;
+        return;
+      }
+      await this.fetchLiveStatus();
+    } catch (e) {
+      this.liveError = e instanceof Error ? e.message : String(e);
+    }
   }
 
   private appendWal(event: Omit<WalEvent, "ts">): void {
@@ -917,6 +995,67 @@ class OpenClawConsentDemoElement extends LitElement {
     this.idempotency.clear();
   }
 
+  private renderLiveView() {
+    return html`
+      <section class="card">
+        <div class="card-title">ConsentGate (Live)</div>
+        <div class="card-sub">
+          Real tokens and events from the gateway. Use ?live=1 in the URL to open in live mode.
+        </div>
+        <div class="row" style="margin-top: 12px;">
+          <button class="btn primary" ?disabled=${this.liveLoading} @click=${() => this.fetchLiveStatus()}>
+            ${this.liveLoading ? "Loading…" : "Refresh"}
+          </button>
+        </div>
+        ${this.liveError
+          ? html`<div class="callout danger" style="margin-top: 12px;">${this.liveError}</div>`
+          : nothing}
+        <div class="row" style="margin-top: 12px; gap: 16px; flex-wrap: wrap;">
+          <div style="min-width: 280px; flex: 1;">
+            <div class="card-sub" style="margin-top: 12px;">Tokens (${this.liveTokens.length})</div>
+            <div class="list" style="margin-top: 8px; max-height: 360px; overflow: auto;">
+              ${this.liveTokens.length === 0
+                ? html`<div class="muted">No tokens.</div>`
+                : this.liveTokens.map(
+                    (t) => html`
+                      <div class="list-item" style="grid-template-columns: minmax(0, 1fr);">
+                        <div class="mono">
+                          <strong>${t.jti}</strong> ${t.tool}
+                          <span class=${`chip ${statusChipClass(t.status)}`} style="margin-left: 8px;">${t.status}</span>
+                          <div class="muted">${t.sessionKey} · issued ${new Date(t.issuedAt).toISOString()}</div>
+                          ${t.status === "issued"
+                            ? html`<button class="btn danger" style="margin-top: 6px;" @click=${() => this.revokeLive(t.jti)}>Revoke</button>`
+                            : nothing}
+                        </div>
+                      </div>
+                    `,
+                  )}
+            </div>
+          </div>
+          <div style="min-width: 280px; flex: 1;">
+            <div class="card-sub" style="margin-top: 12px;">Recent events (${this.liveEvents.length})</div>
+            <div class="list" style="margin-top: 8px; max-height: 360px; overflow: auto;">
+              ${this.liveEvents.length === 0
+                ? html`<div class="muted">No events.</div>`
+                : [...this.liveEvents].reverse().map(
+                    (e) => html`
+                      <div class="list-item" style="grid-template-columns: minmax(0, 1fr);">
+                        <div class="mono" style="line-height: 1.5;">
+                          <strong>${e.type}</strong> ${new Date(e.ts).toISOString()}
+                          ${e.jti ? html`<span> jti=${e.jti}</span>` : nothing}
+                          <span> ${e.tool}</span>
+                          <div class="muted">${e.reasonCode}</div>
+                        </div>
+                      </div>
+                    `,
+                  )}
+            </div>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
   private renderAttackCard(attack: AttackScenario) {
     const token = this.findToken(attack.id);
     const trust = TRUST_TIERS[attack.trustTier];
@@ -1113,79 +1252,118 @@ class OpenClawConsentDemoElement extends LitElement {
               Integrated dashboard simulation for consent-gated operations, context binding, WAL logging, and containment.
             </div>
           </div>
-          <div class="row" style="flex-wrap: wrap; justify-content: flex-end;">
-            <span class="chip mono">T${this.clock}</span>
-            <button class="btn" @click=${() => this.advanceClock()}>+1s</button>
-            <button class="btn" @click=${() => (this.autoTick = !this.autoTick)}>
-              ${this.autoTick ? "Pause Auto" : "Auto Tick"}
+          <div class="row" style="flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px;">
+            <span class="muted" style="margin-right: 8px;">Mode:</span>
+            <button
+              class="btn ${!this.liveMode ? "primary" : ""}"
+              @click=${() => {
+                this.liveMode = false;
+                if (typeof window !== "undefined") {
+                  const u = new URL(window.location.href);
+                  u.searchParams.delete("live");
+                  window.history.replaceState(null, "", u.toString());
+                }
+              }}
+            >
+              Simulation
             </button>
-            <button class="btn danger" @click=${() => this.revokeAll()}>Revoke All</button>
-            ${this.isQuarantined()
-              ? html`<button class="btn" @click=${() => this.liftQuarantine()}>Lift Quarantine</button>`
+            <button
+              class="btn ${this.liveMode ? "primary" : ""}"
+              @click=${() => {
+                this.liveMode = true;
+                if (typeof window !== "undefined") {
+                  const u = new URL(window.location.href);
+                  u.searchParams.set("live", "1");
+                  window.history.replaceState(null, "", u.toString());
+                }
+                this.fetchLiveStatus();
+              }}
+            >
+              Live
+            </button>
+            ${!this.liveMode
+              ? html`
+                  <span class="chip mono">T${this.clock}</span>
+                  <button class="btn" @click=${() => this.advanceClock()}>+1s</button>
+                  <button class="btn" @click=${() => (this.autoTick = !this.autoTick)}>
+                    ${this.autoTick ? "Pause Auto" : "Auto Tick"}
+                  </button>
+                  <button class="btn danger" @click=${() => this.revokeAll()}>Revoke All</button>
+                  ${this.isQuarantined()
+                    ? html`<button class="btn" @click=${() => this.liftQuarantine()}>Lift Quarantine</button>`
+                    : nothing}
+                  <button class="btn" @click=${() => this.reset()}>Reset</button>
+                `
               : nothing}
-            <button class="btn" @click=${() => this.reset()}>Reset</button>
           </div>
         </div>
 
         ${this.notice ? html`<div class=${noticeClass(this.notice.tone)} style="margin-top: 12px;">${this.notice.text}</div>` : nothing}
 
-        <section
-          class="grid"
-          style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-top: 14px;"
-        >
-          <div class="stat">
-            <div class="stat-label">Issued</div>
-            <div class="stat-value">${issued}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Consumed</div>
-            <div class="stat-value">${consumed}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Revoked</div>
-            <div class="stat-value">${revoked}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Expired</div>
-            <div class="stat-value">${expired}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Blocked</div>
-            <div class="stat-value">${blocked}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Denied</div>
-            <div class="stat-value">${denied}</div>
-          </div>
-        </section>
+        ${this.liveMode
+          ? nothing
+          : html`
+              <section
+                class="grid"
+                style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-top: 14px;"
+              >
+                <div class="stat">
+                  <div class="stat-label">Issued</div>
+                  <div class="stat-value">${issued}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Consumed</div>
+                  <div class="stat-value">${consumed}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Revoked</div>
+                  <div class="stat-value">${revoked}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Expired</div>
+                  <div class="stat-value">${expired}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Blocked</div>
+                  <div class="stat-value">${blocked}</div>
+                </div>
+                <div class="stat">
+                  <div class="stat-label">Denied</div>
+                  <div class="stat-value">${denied}</div>
+                </div>
+              </section>
 
-        <div style="margin-top: 14px;">
-          <div class="row" style="justify-content: space-between;">
-            <div class="muted">Containment score ${this.anomalyScore.toFixed(3)} / ${THRESHOLD}</div>
-            <div class="muted">
-              ${this.isQuarantined()
-                ? `Quarantine active (${left}s left, reason: ${this.quarantineReason})`
-                : `Window ops ${this.windowOps}/${MAX_OPS}`}
-            </div>
-          </div>
-          <div style="height: 8px; border-radius: 999px; background: var(--secondary); margin-top: 6px; overflow: hidden;">
-            <div
-              style=${`height: 100%; width: ${anomalyPct}%; background: ${this.isQuarantined() ? "var(--danger)" : "var(--accent)"}; transition: width 120ms ease;`}
-            ></div>
-          </div>
-        </div>
+              <div style="margin-top: 14px;">
+                <div class="row" style="justify-content: space-between;">
+                  <div class="muted">Containment score ${this.anomalyScore.toFixed(3)} / ${THRESHOLD}</div>
+                  <div class="muted">
+                    ${this.isQuarantined()
+                      ? `Quarantine active (${left}s left, reason: ${this.quarantineReason})`
+                      : `Window ops ${this.windowOps}/${MAX_OPS}`}
+                  </div>
+                </div>
+                <div style="height: 8px; border-radius: 999px; background: var(--secondary); margin-top: 6px; overflow: hidden;">
+                  <div
+                    style=${`height: 100%; width: ${anomalyPct}%; background: ${this.isQuarantined() ? "var(--danger)" : "var(--accent)"}; transition: width 120ms ease;`}
+                  ></div>
+                </div>
+              </div>
+            `}
       </section>
 
-      <section
-        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px;"
-      >
-        <div class="stack">
-          ${ATTACKS.map((attack) => this.renderAttackCard(attack))}
-          ${this.renderTrustMatrix()}
-          <section class="card">
-            <div class="card-title">Integration Notes</div>
-            <div class="card-sub">PoC wiring targets real OpenClaw entrypoints and policy defaults.</div>
-            <pre class="code-block" style="margin-top: 12px;">${`// openclaw.json baseline
+      ${this.liveMode
+        ? this.renderLiveView()
+        : html`
+            <section
+              style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 16px;"
+            >
+              <div class="stack">
+                ${ATTACKS.map((attack) => this.renderAttackCard(attack))}
+                ${this.renderTrustMatrix()}
+                <section class="card">
+                  <div class="card-title">Integration Notes</div>
+                  <div class="card-sub">PoC wiring targets real OpenClaw entrypoints and policy defaults.</div>
+                  <pre class="code-block" style="margin-top: 12px;">${`// openclaw.json baseline
 {
   "session": {
     "dmScope": "per-channel-peer"
@@ -1202,12 +1380,13 @@ class OpenClawConsentDemoElement extends LitElement {
 // 2) atomic consume + WAL before gateway dispatch
 // 3) deny on context/bundle/tier mismatch
 // 4) quarantine + cascade revoke on anomaly threshold`}</pre>
-          </section>
-        </div>
-        <div class="stack">
-          ${this.renderWal()} ${this.renderTokenRegistry()}
-        </div>
-      </section>
+                </section>
+              </div>
+              <div class="stack">
+                ${this.renderWal()} ${this.renderTokenRegistry()}
+              </div>
+            </section>
+          `}
     `;
   }
 }

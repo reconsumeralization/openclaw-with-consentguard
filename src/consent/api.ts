@@ -12,6 +12,7 @@ import type {
   ConsentStatusSnapshot,
   ConsentToken,
 } from "./types.js";
+import type { ConsentMetricsSnapshot } from "./metrics.js";
 
 /** Consent decision engine + token store + WAL interface. */
 export type ConsentGateApi = {
@@ -22,6 +23,10 @@ export type ConsentGateApi = {
   revoke(input: ConsentRevokeInput): Promise<{ revoked: number }>;
   bulkRevoke(input: ConsentRevokeInput): Promise<{ revoked: number }>;
   status(query: ConsentStatusQuery): Promise<ConsentStatusSnapshot>;
+  /** Optional: metrics snapshot when observability is enabled. */
+  getMetrics?(): ConsentMetricsSnapshot;
+  /** Optional: remove session key (or tenant id) from quarantine. */
+  liftQuarantine?(sessionKey: string): void;
 };
 
 /**
