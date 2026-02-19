@@ -6,6 +6,8 @@ export type NewsSource = {
   enabled: boolean;
   lastFetched?: Date;
   fetchInterval?: number; // minutes
+  category?: string;
+  tags?: string[];
 };
 
 export type NewsArticle = {

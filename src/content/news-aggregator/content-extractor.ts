@@ -57,7 +57,8 @@ export class ContentExtractor {
         content: article.textContent || article.content || "",
         title: article.title || "",
         excerpt: article.excerpt || "",
-        imageUrl: article.byline || undefined,
+        // Note: Readability doesn't extract imageUrl, would need separate extraction
+        imageUrl: undefined,
       };
     } catch (error) {
       console.error(`Failed to extract content from ${url}:`, error);
