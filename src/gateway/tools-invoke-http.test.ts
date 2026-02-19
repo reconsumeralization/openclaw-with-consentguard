@@ -537,7 +537,7 @@ describe("POST /tools/invoke", () => {
     const body = await res.json();
     expect(body.ok).toBe(false);
     expect(body.error?.type).toBe("consent_denied");
-    expect(body.error?.reasonCode).toBeDefined();
+    expect(body.error?.reasonCode).toBe(CONSENT_REASON.NO_TOKEN);
   });
 
   it("allows gated tool when ConsentGate enforce and valid consent token provided", async () => {
@@ -558,20 +558,11 @@ describe("POST /tools/invoke", () => {
 
     const sessionKeyResolved = "agent:main:main";
     const args: Record<string, unknown> = {};
-    const contextHash = createHash("sha256")
-      .update(
-        JSON.stringify({
-          tool: "sessions_spawn",
-          sessionKey: sessionKeyResolved,
-          args: Object.keys(args)
-            .sort()
-            .reduce<Record<string, unknown>>((acc, k) => {
-              acc[k] = args[k];
-              return acc;
-            }, {}),
-        }),
-      )
-      .digest("hex");
+    const contextHash = buildConsentContextHash({
+      tool: "sessions_spawn",
+      sessionKey: sessionKeyResolved,
+      args,
+    });
 
     const api = resolveConsentGateApi(cfg as OpenClawConfig);
     const token = await api.issue({
@@ -601,5 +592,167 @@ describe("POST /tools/invoke", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
+  });
+
+  it("denies replay of an already consumed consent token", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [{ id: "main", default: true, tools: { allow: ["sessions_spawn"] } }],
+      },
+      gateway: {
+        tools: { allow: ["sessions_spawn"] },
+        consentGate: {
+          enabled: true,
+          observeOnly: false,
+          gatedTools: ["sessions_spawn"],
+        },
+      },
+    } as OpenClawConfig;
+
+    const sessionKeyResolved = "agent:main:main";
+    const args: Record<string, unknown> = {};
+    const contextHash = buildConsentContextHash({
+      tool: "sessions_spawn",
+      sessionKey: sessionKeyResolved,
+      args,
+    });
+    const api = resolveConsentGateApi(cfg as OpenClawConfig);
+    const token = await api.issue({
+      tool: "sessions_spawn",
+      trustTier: "T0",
+      sessionKey: sessionKeyResolved,
+      contextHash,
+      ttlMs: 60_000,
+      issuedBy: "test",
+      policyVersion: "1",
+    });
+    expect(token).not.toBeNull();
+
+    const reqBody = {
+      tool: "sessions_spawn",
+      args,
+      sessionKey: "main",
+      consentToken: token!.jti,
+    };
+
+    const first = await fetch(`http://127.0.0.1:${sharedPort}/tools/invoke`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...gatewayAuthHeaders() },
+      body: JSON.stringify(reqBody),
+    });
+    expect(first.status).toBe(200);
+
+    const second = await fetch(`http://127.0.0.1:${sharedPort}/tools/invoke`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...gatewayAuthHeaders() },
+      body: JSON.stringify(reqBody),
+    });
+    expect(second.status).toBe(403);
+    const body = await second.json();
+    expect(body.error?.reasonCode).toBe(CONSENT_REASON.TOKEN_ALREADY_CONSUMED);
+  });
+
+  it("denies expired consent tokens", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [{ id: "main", default: true, tools: { allow: ["sessions_spawn"] } }],
+      },
+      gateway: {
+        tools: { allow: ["sessions_spawn"] },
+        consentGate: {
+          enabled: true,
+          observeOnly: false,
+          gatedTools: ["sessions_spawn"],
+        },
+      },
+    } as OpenClawConfig;
+
+    const sessionKeyResolved = "agent:main:main";
+    const args: Record<string, unknown> = {};
+    const contextHash = buildConsentContextHash({
+      tool: "sessions_spawn",
+      sessionKey: sessionKeyResolved,
+      args,
+    });
+    const api = resolveConsentGateApi(cfg as OpenClawConfig);
+    const token = await api.issue({
+      tool: "sessions_spawn",
+      trustTier: "T0",
+      sessionKey: sessionKeyResolved,
+      contextHash,
+      ttlMs: 1,
+      issuedBy: "test",
+      policyVersion: "1",
+    });
+    expect(token).not.toBeNull();
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const res = await fetch(`http://127.0.0.1:${sharedPort}/tools/invoke`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...gatewayAuthHeaders() },
+      body: JSON.stringify({
+        tool: "sessions_spawn",
+        args,
+        sessionKey: "main",
+        consentToken: token!.jti,
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error?.reasonCode).toBe(CONSENT_REASON.TOKEN_EXPIRED);
+  });
+
+  it("denies context-mismatched consent token", async () => {
+    cfg = {
+      ...cfg,
+      agents: {
+        list: [{ id: "main", default: true, tools: { allow: ["sessions_spawn"] } }],
+      },
+      gateway: {
+        tools: { allow: ["sessions_spawn"] },
+        consentGate: {
+          enabled: true,
+          observeOnly: false,
+          gatedTools: ["sessions_spawn"],
+        },
+      },
+    } as OpenClawConfig;
+
+    const sessionKeyResolved = "agent:main:main";
+    const issueArgs: Record<string, unknown> = {};
+    const requestArgs: Record<string, unknown> = { path: "/tmp/demo.txt" };
+    const contextHash = buildConsentContextHash({
+      tool: "sessions_spawn",
+      sessionKey: sessionKeyResolved,
+      args: issueArgs,
+    });
+    const api = resolveConsentGateApi(cfg as OpenClawConfig);
+    const token = await api.issue({
+      tool: "sessions_spawn",
+      trustTier: "T0",
+      sessionKey: sessionKeyResolved,
+      contextHash,
+      ttlMs: 60_000,
+      issuedBy: "test",
+      policyVersion: "1",
+    });
+    expect(token).not.toBeNull();
+
+    const res = await fetch(`http://127.0.0.1:${sharedPort}/tools/invoke`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...gatewayAuthHeaders() },
+      body: JSON.stringify({
+        tool: "sessions_spawn",
+        args: requestArgs,
+        sessionKey: "main",
+        consentToken: token!.jti,
+      }),
+    });
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error?.reasonCode).toBe(CONSENT_REASON.CONTEXT_MISMATCH);
   });
 });
