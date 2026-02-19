@@ -274,11 +274,15 @@ export class CognitiveSecurity {
       safe: 1.0,
     };
 
-    if (riskScore >= thresholds.safe) {
+    const safeThreshold = thresholds.safe ?? 1.0;
+    const restrictedThreshold = thresholds.restricted ?? 0.7;
+    const guardedThreshold = thresholds.guarded ?? 0.5;
+
+    if (riskScore >= safeThreshold) {
       return "safe";
-    } else if (riskScore >= thresholds.restricted) {
+    } else if (riskScore >= restrictedThreshold) {
       return "restricted";
-    } else if (riskScore >= thresholds.guarded) {
+    } else if (riskScore >= guardedThreshold) {
       return "guarded";
     } else {
       return "normal";

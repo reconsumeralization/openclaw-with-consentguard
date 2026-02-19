@@ -324,9 +324,12 @@ export async function setupSecurityNonInteractive(
   return await setupSecurityConfig(baseConfig, runtime, {
     confirm: async () => Promise.resolve(true),
     select: async () => Promise.resolve("standard"),
+    multiselect: async () => Promise.resolve([]),
+    text: async () => Promise.resolve(""),
     note: async () => Promise.resolve(),
     intro: async () => Promise.resolve(),
     outro: async () => Promise.resolve(),
+    progress: () => ({ update: () => {}, end: () => {} }),
   } as WizardPrompter, {
     enableLLMSecurity: true,
     enableCognitiveSecurity: true,

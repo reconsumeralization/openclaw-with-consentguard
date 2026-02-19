@@ -42,21 +42,23 @@ export class SwarmAgents {
     this.config = config;
     
     if (config.redTeamSwarm?.enabled) {
-      this.redTeamAgents = config.redTeamSwarm.agents ?? [
+      const defaultRedAgents: RedTeamAgent[] = [
         "attack_generator",
         "payload_optimizer",
         "evaluation_agent",
         "coverage_analyst",
       ];
+      this.redTeamAgents = (config.redTeamSwarm.agents as RedTeamAgent[]) ?? defaultRedAgents;
     }
 
     if (config.blueTeamSwarm?.enabled) {
-      this.blueTeamAgents = config.blueTeamSwarm.agents ?? [
+      const defaultBlueAgents: BlueTeamAgent[] = [
         "threat_detector",
         "defense_validator",
         "risk_assessor",
         "mitigation_planner",
       ];
+      this.blueTeamAgents = (config.blueTeamSwarm.agents as BlueTeamAgent[]) ?? defaultBlueAgents;
     }
   }
 

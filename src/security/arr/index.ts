@@ -301,9 +301,10 @@ export class AdversaryRecommender {
 
     for (let i = 0; i < maxIterations; i++) {
       const mutated = this.mutatePayloads(optimized);
-      const better = mutated.filter(
-        (t) => t.riskScore > optimized.find((o) => o.id === t.id)?.riskScore ?? 0,
-      );
+      const better = mutated.filter((t) => {
+        const existing = optimized.find((o) => o.id === t.id);
+        return t.riskScore > (existing?.riskScore ?? 0);
+      });
       if (better.length > 0) {
         optimized = mutated;
         improvements += better.length;

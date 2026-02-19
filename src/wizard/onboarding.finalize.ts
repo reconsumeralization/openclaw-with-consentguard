@@ -497,7 +497,6 @@ export async function finalizeOnboardingWizard(
       skipGateway: !gatewayProbe.ok,
       skipChannels: opts.skipChannels ?? opts.skipProviders ?? false,
       skipSecurity: opts.skipSecurity ?? false,
-      skipMessageFlow: opts.skipMessageFlow ?? true, // Optional, can be enabled later
     });
 
     await prompter.note(formatVerificationResults(verification), "Verification");
@@ -512,13 +511,14 @@ export async function finalizeOnboardingWizard(
         try {
           const { runSecurityAudit } = await import("../security/audit.js");
           const auditResult = await runSecurityAudit({
+            config: nextConfig,
             deep: true,
-            fix: false,
           });
 
-          if (auditResult.summary.total > 0) {
+          const totalIssues = auditResult.summary.critical + auditResult.summary.warn + auditResult.summary.info;
+          if (totalIssues > 0) {
             await prompter.note(
-              `Security audit found ${auditResult.summary.total} issue(s): ${auditResult.summary.critical} critical, ${auditResult.summary.warning} warnings`,
+              `Security audit found ${totalIssues} issue(s): ${auditResult.summary.critical} critical, ${auditResult.summary.warn} warnings, ${auditResult.summary.info} info`,
               "Security Audit",
             );
 
